@@ -157,11 +157,10 @@ namespace RockPhysics
             //AddTrainingData(m3);
 
             // Assign which rock model you want here:
-            RockModel rtemp = rm;
+            RockModel rtemp = rm2;
 
             int ns = rtemp.ns;
             double[] phi = rtemp.phi;
-            double[] rhob = rtemp.rhob;
             double[] k = rtemp.kdry;
             double[] g = rtemp.gdry;
 
@@ -171,16 +170,17 @@ namespace RockPhysics
                 {
                     var l1 = new List<double>();
                     var l2 = new List<double>();
-
-                    double vs = Math.Sqrt(g[i] / rhob[i]);
-
+                    
                     for (double s = 0; s <= 1; s += 0.05)
                     {
-                        double ks = rtemp.K_sat(k[i], phi[i], gcv("Kmin"), rm.fluid.homo(s, 0, 1 - s));
-                        double vp = Math.Sqrt((ks + 4 * g[i] / 3) / rhob[i]);
+                        // Create new rhob using the new fluids and grain density
+                        double rhob = (1 - phi[i]) * rtemp.gd + phi[i] * rtemp.fluid.density_voight(s, 0, 1 - s);
+                        double vs = Math.Sqrt(g[i] / rhob);
+                        double ksat = rtemp.K_sat(k[i], phi[i], gcv("Kmin"), rm.fluid.homo(s, 0, 1 - s));
+                        double vp = Math.Sqrt((ksat + 4 * g[i] / 3) / rhob);
                         double vpvs = vp / vs;
                         double pr = 0.5 * (Math.Pow(vpvs, 2) - 2) / (Math.Pow(vpvs, 2) - 1);
-                        l1.Add(vp * rhob[i]);
+                        l1.Add(vp * rhob);
                         l2.Add(pr);
                     }
 
