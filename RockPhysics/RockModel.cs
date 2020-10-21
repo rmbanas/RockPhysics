@@ -79,6 +79,8 @@ namespace RockPhysics
                 phi = f.LinSpace(0, phi_c, ns);
 
                 rhob = new double[ns];
+                kdry = new double[ns];
+                gdry = new double[ns];
                 kdry_upper = new double[ns];
                 kdry_lower = new double[ns];
                 gdry_upper = new double[ns];
