@@ -1,17 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+﻿using System.Windows.Forms;
 
 namespace RockPhysics
 {
+    /// <summary>
+    /// This is a class to encapsulate both a label and text box together since VisualStudio doesn't allow this functionality
+    /// Viz. idiots
+    /// </summary>
     class Field : FlowLayoutPanel
     {
+        // Label and text box
         public Label label;
         public TextBox text_box;
 
+        /// <summary>
+        /// Inherited constructor from FlowLayoutPanel
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
         public Field(string name, string value)
             : base()
         {

@@ -1,24 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+﻿using OxyPlot;
 using OxyPlot.Series;
-using OxyPlot;
+using System;
+using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace RockPhysics
 {
 
     public partial class Form1 : Form
     {
+        // OxyPlot models
         private PlotModel m1;
         private PlotModel m2;
         private PlotModel m3;
 
+        /// <summary>
+        /// Initialize the form and add controls
+        /// </summary>
         public Form1()
         {
             InitializeComponent();
@@ -77,7 +75,11 @@ namespace RockPhysics
 
         }
 
-        // "Get control value"
+        /// <summary>
+        /// Retrieve value from a given control by name
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
         private double gcv(string name)
         {
             foreach (Control c in panel1.Controls)
@@ -93,10 +95,15 @@ namespace RockPhysics
             return 0;
         }
 
+        /// <summary>
+        /// Temporary button to 'do all the work'
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void btnDoIt_Click(object sender, EventArgs e)
         {
             RockModel rm = new RockModel();
-            rm.ns = Convert.ToInt16(gcv("Cphi")*100+1);
+            rm.ns = Convert.ToInt16(gcv("Cphi") * 100 + 1);
 
             rm.fluid.kwater = gcv("Kwater");
             rm.fluid.rhowater = gcv("RHOwater");
@@ -131,11 +138,11 @@ namespace RockPhysics
             m1.Series.Clear();
             m1.Series.Add(CreateLineSeries(rm.phi, rm.kdry_lower, "Friable KLower", OxyColors.Black));
             m1.Series.Add(CreateLineSeries(rm.phi, rm.kdry_upper, "Friable KUpper", OxyColors.Black, LineStyle.Dash));
-            m1.Series.Add(CreateLineSeries(rm.phi, rm.g_lower, "Friable GLower", OxyColors.Blue));
-            m1.Series.Add(CreateLineSeries(rm.phi, rm.g_upper, "Friable GLower", OxyColors.Red, LineStyle.Dash));
+            m1.Series.Add(CreateLineSeries(rm.phi, rm.gdry_lower, "Friable GLower", OxyColors.Blue));
+            m1.Series.Add(CreateLineSeries(rm.phi, rm.gdry_upper, "Friable GLower", OxyColors.Red, LineStyle.Dash));
             m1.Series.Add(CreateLineSeries(rm.phi, rm.ksat, "KSat (upper)", OxyColors.SaddleBrown));
             m1.Series.Add(CreateLineSeries(rm2.phi, rm2.ksat, "KSat (Contact Cement)", OxyColors.SeaGreen));
-            m1.Series.Add(CreateLineSeries(rm2.phi, rm2.g, "G (Contact Cement)", OxyColors.Orange));
+            m1.Series.Add(CreateLineSeries(rm2.phi, rm2.gdry, "G (Contact Cement)", OxyColors.Orange));
             m1.InvalidatePlot(true);
 
             m2.Series.Clear();
@@ -150,15 +157,17 @@ namespace RockPhysics
             //AddTrainingData(m3);
 
             // Assign which rock model you want here:
-            int ns          = rm2.ns;
-            double[] phi    = rm2.phi;
-            double[] g      = rm2.g;
-            double[] rhob   = rm2.rhob;
-            double[] k      = rm2.kdry;
+            RockModel rtemp = rm;
+
+            int ns = rtemp.ns;
+            double[] phi = rtemp.phi;
+            double[] rhob = rtemp.rhob;
+            double[] k = rtemp.kdry;
+            double[] g = rtemp.gdry;
 
             for (int i = 0; i < ns; i++)
             {
-                if (Math.Round(phi[i]*100,0) % 5 == 0)
+                if (Math.Round(phi[i] * 100, 0) % 5 == 0)
                 {
                     var l1 = new List<double>();
                     var l2 = new List<double>();
@@ -166,12 +175,12 @@ namespace RockPhysics
                     double vs = Math.Sqrt(g[i] / rhob[i]);
 
                     for (double s = 0; s <= 1; s += 0.05)
-                    {                        
-                        double ks = rm2.K_sat(k[i], phi[i], gcv("Kmin"), rm.fluid.homo(s, 0, 1-s));
+                    {
+                        double ks = rtemp.K_sat(k[i], phi[i], gcv("Kmin"), rm.fluid.homo(s, 0, 1 - s));
                         double vp = Math.Sqrt((ks + 4 * g[i] / 3) / rhob[i]);
                         double vpvs = vp / vs;
                         double pr = 0.5 * (Math.Pow(vpvs, 2) - 2) / (Math.Pow(vpvs, 2) - 1);
-                        l1.Add(vp*rhob[i]);
+                        l1.Add(vp * rhob[i]);
                         l2.Add(pr);
                     }
 
@@ -183,6 +192,16 @@ namespace RockPhysics
 
         }
 
+        /// <summary>
+        /// Generate a line series for a given set of arrays, specifying color and linestyle, etc.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="name"></param>
+        /// <param name="color"></param>
+        /// <param name="ls"></param>
+        /// <param name="st"></param>
+        /// <returns></returns>
         private LineSeries CreateLineSeries(double[] x, double[] y, string name, OxyColor color, LineStyle ls = LineStyle.Automatic, double st = 2)
         {
             var s1 = new LineSeries()
@@ -202,6 +221,15 @@ namespace RockPhysics
             return s1;
         }
 
+
+        /// <summary>
+        /// Create a scatter series for two given arrays with parameters
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="name"></param>
+        /// <param name="color"></param>
+        /// <returns></returns>
         private ScatterSeries CreateScatterSeries(double[] x, double[] y, string name, OxyColor color)
         {
             var s1 = new ScatterSeries()
@@ -209,7 +237,7 @@ namespace RockPhysics
                 Title = name,
                 MarkerType = MarkerType.Circle,
                 MarkerSize = 1,
-                MarkerFill = color               
+                MarkerFill = color
             };
 
 
@@ -221,6 +249,10 @@ namespace RockPhysics
             return s1;
         }
 
+        /// <summary>
+        /// Generic Egypt training data
+        /// </summary>
+        /// <param name="m"></param>
         private void AddTrainingData(PlotModel m)
         {
             double[] datax = new double[3021];
