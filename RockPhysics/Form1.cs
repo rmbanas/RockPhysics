@@ -14,6 +14,12 @@ namespace RockPhysics
         private PlotModel m2;
         private PlotModel m3;
 
+        private RockModel rm;
+        private RockModel rm2;
+        private List<RockModel> rms;
+
+        private List<Control> controls;
+
         /// <summary>
         /// Initialize the form and add controls
         /// </summary>
@@ -21,25 +27,33 @@ namespace RockPhysics
         {
             InitializeComponent();
 
+            controls = new List<Control>();
+
             //Populate boxes
-            panel1.Controls.Add(btnDoIt);
-            panel1.Controls.Add(new Field("Kmin", "37"));
-            panel1.Controls.Add(new Field("Gmin", "44"));
-            panel1.Controls.Add(new Field("P", "0.018"));
-            panel1.Controls.Add(new Field("PR min", "0.17"));
-            panel1.Controls.Add(new Field("Cphi", "0.4"));
-            panel1.Controls.Add(new Field("Gcem", "44"));
-            panel1.Controls.Add(new Field("PRcem", "0.08"));
-            panel1.Controls.Add(new Field("Kwater", "2.717"));
-            panel1.Controls.Add(new Field("RHOwater", "1.04"));
-            panel1.Controls.Add(new Field("Koil", "0.6441"));
-            panel1.Controls.Add(new Field("RHOoil", "0.449"));
-            panel1.Controls.Add(new Field("Kgas", "0.05"));
-            panel1.Controls.Add(new Field("RHOgas", "0.1"));
-            panel1.Controls.Add(new Field("GrainDen", "2.65"));
-            panel1.Controls.Add(new Field("Sw", "1"));
-            panel1.Controls.Add(new Field("So", "0"));
-            panel1.Controls.Add(new Field("Sg", "0"));
+            controls.Add(btnDoIt);
+            controls.Add(new Combo("RockModel", new string[] {"Friable", "Cemented"}));
+            controls.Add(new Combo("CemType", new string[] { "Grain Contact", "Grain Coated" }));
+            controls.Add(new Field("Kmin", "38"));
+            controls.Add(new Field("Gmin", "44"));
+            controls.Add(new Field("P", "0.018"));
+            controls.Add(new Field("Cphi", "0.4"));
+            controls.Add(new Field("Kcem", "38"));
+            controls.Add(new Field("Gcem", "44"));
+            controls.Add(new Field("Kwater", "2.717"));
+            controls.Add(new Field("RHOwater", "1.04"));
+            controls.Add(new Field("Koil", "0.6441"));
+            controls.Add(new Field("RHOoil", "0.449"));
+            controls.Add(new Field("Kgas", "0.05"));
+            controls.Add(new Field("RHOgas", "0.1"));
+            controls.Add(new Field("GrainDen", "2.65"));
+            controls.Add(new Field("Sw", "1"));
+            controls.Add(new Field("So", "0"));
+            controls.Add(new Field("Sg", "0"));
+
+            foreach(Control c in controls)
+            {
+                panel1.Controls.Add(c);
+            }
 
             panel1.Dock = DockStyle.Right;
 
@@ -73,6 +87,14 @@ namespace RockPhysics
 
             plotView3.Model = m3;
 
+            rm = new RockModel();
+            rm2 = new RockModel();
+
+            rms = new List<RockModel>
+            {
+                rm,
+                rm2
+            };
         }
 
         /// <summary>
@@ -82,7 +104,7 @@ namespace RockPhysics
         /// <returns></returns>
         private double gcv(string name)
         {
-            foreach (Control c in panel1.Controls)
+            foreach (Control c in controls)
             {
                 if (c.GetType() == typeof(Field))
                 {
@@ -96,43 +118,53 @@ namespace RockPhysics
         }
 
         /// <summary>
+        /// Retreive value from combobox
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        private string cbov(string name)
+        {
+            foreach(Control c in controls)
+            {
+                if(c.GetType() == typeof(Combo))
+                {
+                    if (((Combo)c).label.Text == name)
+                    {
+                        return Convert.ToString(((Combo)c).combo_box.SelectedItem.ToString());
+                    }
+                }
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
         /// Temporary button to 'do all the work'
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void btnDoIt_Click(object sender, EventArgs e)
         {
-            RockModel rm = new RockModel();
-            rm.ns = Convert.ToInt16(gcv("Cphi") * 100 + 1);
+            // Assign variables
+            foreach(RockModel r in rms)
+            {
+                r.ns = Convert.ToInt16(gcv("Cphi") * 100 + 1);
+                r.fluid.kwater = gcv("Kwater");
+                r.fluid.rhowater = gcv("RHOwater");
+                r.fluid.koil = gcv("Koil");
+                r.fluid.rhooil = gcv("RHOoil");
+                r.fluid.kgas = gcv("Kgas");
+                r.fluid.rhogas = gcv("RHOgas");
+                r.gd = gcv("GrainDen");
+                r.sw = gcv("Sw");
+                r.so = gcv("So");
+                r.sg = gcv("Sg");
+            }
 
-            rm.fluid.kwater = gcv("Kwater");
-            rm.fluid.rhowater = gcv("RHOwater");
-            rm.fluid.koil = gcv("Koil");
-            rm.fluid.rhooil = gcv("RHOoil");
-            rm.fluid.kgas = gcv("Kgas");
-            rm.fluid.rhogas = gcv("RHOgas");
-            rm.gd = gcv("GrainDen");
-            rm.sw = gcv("Sw");
-            rm.so = gcv("So");
-            rm.sg = gcv("Sg");
-
-            rm.FriableSand(gcv("Kmin"), gcv("Gmin"), gcv("P"), gcv("PR min"), gcv("Cphi"));
+            rm.FriableSand(gcv("Kmin"), gcv("Gmin"), gcv("P"), gcv("Cphi"));
             rm.ComputeRP();
 
-            RockModel rm2 = new RockModel();
-            rm2.ns = Convert.ToInt16(gcv("Cphi") * 100 + 1);
-            rm2.fluid.kwater = gcv("Kwater");
-            rm2.fluid.rhowater = gcv("RHOwater");
-            rm2.fluid.koil = gcv("Koil");
-            rm2.fluid.rhooil = gcv("RHOoil");
-            rm2.fluid.kgas = gcv("Kgas");
-            rm2.fluid.rhogas = gcv("RHOgas");
-            rm2.gd = gcv("GrainDen");
-            rm2.sw = gcv("Sw");
-            rm2.so = gcv("So");
-            rm2.sg = gcv("Sg");
-
-            rm2.ContactCement(false, gcv("Gcem"), gcv("Gmin"), gcv("PR min"), gcv("PRcem"), gcv("Cphi"));
+            var cemtype = cbov("CemType") == "Grain Contact" ? true : false;
+            rm2.ContactCement(cemtype, gcv("Gmin"), gcv("Gcem"), gcv("Kmin"), gcv("Kcem"), gcv("Cphi"));
             rm2.ComputeRP();
 
             m1.Series.Clear();
@@ -157,16 +189,23 @@ namespace RockPhysics
             //AddTrainingData(m3);
 
             // Assign which rock model you want here:
-            RockModel rtemp = rm2;
+            RockModel rtemp = cbov("RockModel") == "Friable" ? rm : rm2;
 
-            int ns = rtemp.ns;
-            double[] phi = rtemp.phi;
-            double[] k = rtemp.kdry;
-            double[] g = rtemp.gdry;
-
+            var ns = rtemp.ns;
+            // This PHI is going to be the porosity that is not cemented filled        
+            // Will need to modify calculations below for grain density / RHOB etc. to account for both cement and matrix
+            var phiarr = rtemp.phi;
+            var k = rtemp.kdry;
+            var g = rtemp.gdry;
+            
             for (int i = 0; i < ns; i++)
             {
-                if (Math.Round(phi[i] * 100, 0) % 5 == 0)
+                // Account for cement model solid modulus
+                var kmin = cbov("RockModel") == "Friable" ? gcv("Kmin") : rtemp.ksolid[i];
+                //var phi = cbov("RockModel") == "Friable" ? phiarr[i] : gcv("Cphi") - phiarr[i];
+                var phi = phiarr[i];
+
+                if (Math.Round(phi * 100, 0) % 5 == 0)
                 {
                     var l1 = new List<double>();
                     var l2 = new List<double>();
@@ -174,17 +213,17 @@ namespace RockPhysics
                     for (double s = 0; s <= 1; s += 0.05)
                     {
                         // Create new rhob using the new fluids and grain density
-                        double rhob = (1 - phi[i]) * rtemp.gd + phi[i] * rtemp.fluid.density_voight(s, 0, 1 - s);
-                        double vs = Math.Sqrt(g[i] / rhob);
-                        double ksat = rtemp.K_sat(k[i], phi[i], gcv("Kmin"), rm.fluid.homo(s, 0, 1 - s));
-                        double vp = Math.Sqrt((ksat + 4 * g[i] / 3) / rhob);
-                        double vpvs = vp / vs;
-                        double pr = 0.5 * (Math.Pow(vpvs, 2) - 2) / (Math.Pow(vpvs, 2) - 1);
+                        var rhob = (1 - phi) * rtemp.gd + phi * rtemp.fluid.density_voight(s, 0, 1 - s);
+                        var vs = Math.Sqrt(g[i] / rhob);
+                        var ksat = rtemp.K_sat(k[i], phi, kmin, rm.fluid.homo(s, 0, 1 - s));
+                        var vp = Math.Sqrt((ksat + 4.0 * g[i] / 3.0) / rhob);
+                        var vpvs = vp / vs;
+                        var pr = 0.5 * (Math.Pow(vpvs, 2) - 2) / (Math.Pow(vpvs, 2) - 1);
                         l1.Add(vp * rhob);
                         l2.Add(pr);
                     }
 
-                    m3.Series.Add(CreateLineSeries(l1.ToArray(), l2.ToArray(), "PHI=" + phi[i].ToString(), OxyColors.Automatic, LineStyle.Automatic, 5));
+                    m3.Series.Add(CreateLineSeries(l1.ToArray(), l2.ToArray(), "PHI=" + Math.Round(phi,2).ToString(), OxyColors.Automatic, LineStyle.Automatic, 5));
                 }
             }
 

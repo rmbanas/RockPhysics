@@ -18,6 +18,8 @@ namespace RockPhysics
         public double[] kdry { get; set; }
         public double[] gdry { get; set; }
         public double[] ksat { get; set; }
+        public double[] ksolid { get; set; }
+        public double[] gsolid { get; set; }
 
         // Outputs specific to bounds
         public double[] kdry_upper { get; set; }
@@ -72,12 +74,11 @@ namespace RockPhysics
         /// <param name="p"></param>
         /// <param name="v"></param>
         /// <param name="phi_c"></param>
-        public void FriableSand(double kmin, double gmin, double p, double v, double phi_c)
+        public void FriableSand(double kmin, double gmin, double p, double phi_c)
         {
             try
             {
                 phi = f.LinSpace(0, phi_c, ns);
-
                 rhob = new double[ns];
                 kdry = new double[ns];
                 gdry = new double[ns];
@@ -90,6 +91,7 @@ namespace RockPhysics
                 double z1 = 0;
                 double z2 = 0;
 
+                double v = 0.5 * ((kmin / gmin - (2.0 / 3.0)) / (kmin / gmin + (1.0 / 3.0)));
                 double n_c = cn(phi_c);
                 double khm = Math.Pow(p * (Math.Pow(n_c, 2) * Math.Pow(1 - phi_c, 2) * Math.Pow(gmin, 2)) / (18 * Math.Pow(Math.PI, 2) * Math.Pow(1 - v, 2)), 0.33333);
                 double a = (5 - 4 * v) / (5 * (2 - v));
@@ -140,27 +142,31 @@ namespace RockPhysics
         /// <param name="nu"></param>
         /// <param name="nuC"></param>
         /// <param name="phi_c"></param>
-        public void ContactCement(bool cemsch, double Gc, double G, double nu, double nuC, double phi_c)
+        public void ContactCement(bool cemsch, double G, double Gc, double K, double Kc, double phi_c)
         {
             ksat = new double[ns];
             phi = new double[ns];
             rhob = new double[ns];
             gdry = new double[ns];
             kdry = new double[ns];
+            ksolid = new double[ns];
+            gsolid = new double[ns];
 
             double C = cn(phi_c);
-            double K = G * 2.0 * (1 + nu) / (3.0 * (1.0 - 2.0 * nu));
-            double Kc = Gc * 2.0 * (1 + nuC) / (3.0 * (1.0 - 2.0 * nuC));
+            double nuC = 0.5 * ((Kc / Gc - (2.0 / 3.0)) / (Kc / Gc + (1.0 / 3.0)));
 
             for (int i = 0; i < ns; i++)
             {
-                phi[i] = phi_c - (i - 1) * (phi_c) / (ns - 1);                          // Porosity
-                //double fc = phi_c - phi[i];                                           // Fraction of cement in solid
-                double fgs = (1 - phi_c) / (1 - phi[i]);                                 
-                double fcs = (phi_c - phi[i]) / (1 - phi[i]);                           
-                double Ks = (fgs * K + fcs * Kc + 1 / (fgs / K + fcs / Kc)) / 2.0;      // Bulk mod of solid 
-                double Gs = (fgs * G + fcs * Gc + 1 / (fgs / G + fcs / Gc)) / 2.0;      // Shear mod of solid 
-                //double Ms = Ks + 4 * Gs / 3;
+                phi[i] = phi_c - (i * phi_c / (ns-1));                                  // Porosity
+                double fc = phi_c - phi[i];                                             // Porosity fraction of cement (critical - phi) 
+                double fgs = (1 - phi_c) / (1 - phi[i]);                                // Percentage of rock matrix to total rock solid
+                double fcs = (fc) / (1 - phi[i]);                                       // Percentage of rock cement to total rock solid
+                ksolid[i] = (fgs * K + fcs * Kc + 1.0 / (fgs / K + fcs / Kc)) / 2.0;    // Bulk mod of solid 
+                gsolid[i] = (fgs * G + fcs * Gc + 1.0 / (fgs / G + fcs / Gc)) / 2.0;    // Shear mod of solid 
+                //double Ms = Ks + 4.0 * Gs / 3.0;
+
+                // This is of the SOLID, not the mineral (including cement)
+                double nu = 0.5 * ((ksolid[i] / gsolid[i] - (2.0 / 3.0)) / (ksolid[i] / gsolid[i] + (1.0 / 3.0)));
 
                 // Two cement schemes
                 // First one (0.25 power) assumes all cement depsoited at grain contacts
@@ -168,36 +174,34 @@ namespace RockPhysics
                 double a = cemsch ? 2.0 * Math.Pow(((phi_c - phi[i]) / (3.0 * C * (1 - phi_c))), 0.25) : Math.Pow((2.0 / 3.0) * ((phi_c - phi[i]) / (1 - phi_c)), 0.5);
 
                 //Capital Lambdas
-                double alam = 2.0 * Gc * (1 - nu) * (1 - nuC) / (Math.PI * G * (1.0 - 2.0 * nuC));
-                double alamtau = Gc / (Math.PI * G);
+                double alam = 2.0 * Gc * (1.0 - nu) * (1.0 - nuC) / (Math.PI * gsolid[i] * (1.0 - 2.0 * nuC));
+                double alamtau = Gc / (Math.PI * gsolid[i]);
 
                 // Effective bulk modulus
                 double r1 = Kc + 4.0 * Gc / 3.0;
                 double r2 = C * (1.0 - phi_c);
                 double r3 = -0.024153 * Math.Pow(alam, -1.3646) * Math.Pow(a, 2) + 0.20405 * Math.Pow(alam, -0.89008) * a + 0.00024649 * Math.Pow(alam, -1.9864);
-                double Kframe = (r1 * r2 * r3) / 6.0;
+                kdry[i] = (r1 * r2 * r3) / 6.0;
 
                 // Effective shear modulus
-                r1 = Gc;
-                r2 = 3 * C * (1 - phi_c) / 20.0;
-                double a1t = -0.01 * (2.2606 * Math.Pow(nu, 2) + 2.0696 * nu + 2.2952);
-                double a2t = 0.079011 * Math.Pow(nu, 2) + 0.17539 * nu - 1.3418;
+                r1 = Gc/20;
+                r2 = 3 * C * (1.0 - phi_c);
+                double a1t = Math.Pow(-10,-2) * (2.2606 * Math.Pow(nu, 2) + 2.0696 * nu + 2.2952);
+                double a2t = 0.07901 * Math.Pow(nu, 2) + 0.17539 * nu - 1.3418;
                 double b1t = 0.05728 * Math.Pow(nu, 2) + 0.09367 * nu + 0.20162;
-                double b2t = 0.027425 * Math.Pow(nu, 2) + 0.052859 * nu - 0.87653;
-                double c1t = 0.0001 * (9.6544 * Math.Pow(nu, 2) + 4.9445 * nu + 3.1008);
-                double c2t = 0.018667 * Math.Pow(nu, 2) + 0.4011 * nu - 1.8186;
+                double b2t = 0.02742 * Math.Pow(nu, 2) + 0.05286 * nu - 0.87653;
+                double c1t = Math.Pow(10,-4) * (9.6544 * Math.Pow(nu, 2) + 4.9445 * nu + 3.1008);
+                double c2t = 0.01867 * Math.Pow(nu, 2) + 0.4011 * nu - 1.8186;
                 r3 = a1t * Math.Pow(alamtau, a2t) * Math.Pow(a, 2) + b1t * Math.Pow(alamtau, b2t) * a + c1t * Math.Pow(alamtau, c2t);
-                double Gframe = (3.0 * Kframe / 5.0) + r1 * r2 * r3;
-                double Mframe = Kframe + 4 * Gframe / 3;
+                gdry[i] = (3.0 * kdry[i] / 5.0) + (r1 * r2 * r3);
+                //double Mframe = Kframe + 4 * Gframe / 3;
 
                 // Gassmann
-                //ksat[i] = Ks * (phi[i] * Kframe - (1 + phi[i]) * fluid.kfl * Kframe / Ks + fluid.kfl) / ((1 - phi[i]) * fluid.kfl + phi[i] * Ks - fluid.kfl * Kframe / Ks);
-                //double Msat = ksat[i] + 4 * Gframe / 3;
+                //ksat[i] = ksolid[i] * (phi[i] * kdry[i] - (1 + phi[i]) * fluid.homo(1.0,0,0) * kdry[i] / ksolid[i] + fluid.homo(1.0,0,0) / ((1 - phi[i]) * fluid.homo(1.0, 0, 0) + phi[i] * ksolid[i] - fluid.homo(1.0, 0, 0) * kdry[i] / ksolid[i]));
+                //double Msat = ksolid[i]at[i] + 4 * Gframe / 3;
 
                 // Assign variables
-                ksat[i] = K_sat(Kframe, phi[i], Ks, fluid.homo(1.0, 0, 0));
-                kdry[i] = Kframe;
-                gdry[i] = Gframe;
+                ksat[i] = K_sat(kdry[i], phi[i], ksolid[i], fluid.homo(1.0, 0, 0));
                 rhob[i] = MakeDensity(phi[i]);
 
                 //ComputeRP(Ksat, Gframe, MakeDensity(phi[i], rhofl, 2.65), ref RPout);
